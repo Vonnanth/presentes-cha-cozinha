@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Presentes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <style>
+        .gift-item {
+            transition: all 0.3s ease;
+        }
+
+        .gift-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .purchased {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .purchased::after {
+            content: "COMPRADO";
+            position: absolute;
+            top: 10px;
+            right: -30px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 30px;
+            transform: rotate(45deg);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-pink-600 mb-2">Lista de Presentes</h1>
+        <p class="text-gray-600">Escolha um presente para nos presentear em nosso casamento</p>
+        <div class="w-24 h-1 bg-pink-400 mx-auto mt-4"></div>
+    </header>
+
+    <!-- Stats -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8 flex flex-wrap justify-between items-center">
+        <div class="text-center px-4 py-2">
+            <div class="text-3xl font-bold text-pink-600" id="total-gifts">0</div>
+            <div class="text-gray-500">Presentes disponíveis</div>
+        </div>
+        <div class="text-center px-4 py-2">
+            <div class="text-3xl font-bold text-green-600" id="purchased-gifts">0</div>
+            <div class="text-gray-500">Presentes comprados</div>
+        </div>
+        <div class="text-center px-4 py-2">
+            <div class="text-3xl font-bold text-blue-600" id="remaining-gifts">0</div>
+            <div class="text-gray-500">Presentes restantes</div>
+        </div>
+    </div>
+
+    <!-- Filter buttons -->
+    <div class="flex justify-center mb-8 space-x-4">
+        <button class="filter-btn px-4 py-2 rounded-full bg-pink-600 text-white" data-filter="all">Todos</button>
+        <button class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700" data-filter="available">
+            Disponíveis
+        </button>
+        <button class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700" data-filter="purchased">Comprados
+        </button>
+    </div>
+
+    <!-- Gift list -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="gift-list">
+        <!-- Gift items will be added here by JavaScript -->
+    </div>
+
+    <!-- Purchase Modal -->
+    <div class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" id="purchase-modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Confirmar compra</h3>
+            <p class="mb-4">Você está comprando: <span class="font-semibold" id="modal-gift-name"></span></p>
+
+            <div class="mb-4">
+                <label for="buyer-name" class="block text-gray-700 mb-2">Seu nome:</label>
+                <input type="text" id="buyer-name"
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                       placeholder="Digite seu nome completo">
+                <p class="text-red-500 text-sm mt-1 hidden" id="name-error">Por favor, digite seu nome</p>
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <button class="px-4 py-2 bg-gray-300 rounded-lg" id="cancel-purchase">Cancelar</button>
+                <button class="px-4 py-2 bg-pink-600 text-white rounded-lg" id="confirm-purchase">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Gift Button -->
+    <button id="add-gift-btn"
+            class="fixed bottom-8 right-8 bg-pink-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-pink-700 transition">
+        <i class="fas fa-plus text-xl"></i>
+    </button>
+
+    <!-- Add Gift Modal -->
+    <div class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" id="add-gift-modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Adicionar Presente</h3>
+
+            <div class="mb-4">
+                <label for="gift-name" class="block text-gray-700 mb-2">Nome do Presente:</label>
+                <input type="text" id="gift-name"
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                       placeholder="Ex: Jogo de Panelas">
+            </div>
+
+            <div class="mb-4">
+                <label for="gift-image" class="block text-gray-700 mb-2">URL da Imagem:</label>
+                <input type="text" id="gift-image"
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                       placeholder="https://exemplo.com/imagem.jpg">
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <button class="px-4 py-2 bg-gray-300 rounded-lg" id="cancel-add-gift">Cancelar</button>
+                <button class="px-4 py-2 bg-pink-600 text-white rounded-lg" id="confirm-add-gift">Adicionar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thank You Modal -->
+    <div class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" id="thankyou-modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+            <div class="text-green-500 text-6xl mb-4">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Obrigado!</h3>
+            <p class="mb-4">Sua compra foi registrada com sucesso.</p>
+            <button class="px-4 py-2 bg-pink-600 text-white rounded-lg" id="close-thankyou">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Firebase configuration
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+    const firebaseConfig = {
+        apiKey: "AIzaSyAJXXO_8PbXXsk_yqC5vzQEUUdq-BO2uAY",
+        authDomain: "presentes-cha-cozinha.firebaseapp.com",
+        projectId: "presentes-cha-cozinha",
+        storageBucket: "presentes-cha-cozinha.firebasestorage.app",
+        messagingSenderId: "413574337572",
+        appId: "1:413574337572:web:32a614a6444b6e356774b1",
+        measurementId: "G-YVHZF6BZQK"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Array para armazenar os presentes
+    let gifts = [];
+
+    // DOM elements
+    const giftList = document.getElementById('gift-list');
+    const addGiftBtn = document.getElementById('add-gift-btn');
+    const addGiftModal = document.getElementById('add-gift-modal');
+    const cancelAddGiftBtn = document.getElementById('cancel-add-gift');
+    const confirmAddGiftBtn = document.getElementById('confirm-add-gift');
+    const giftNameInput = document.getElementById('gift-name');
+    const giftImageInput = document.getElementById('gift-image');
+    const purchaseModal = document.getElementById('purchase-modal');
+    const thankyouModal = document.getElementById('thankyou-modal');
+    const modalGiftName = document.getElementById('modal-gift-name');
+    const buyerNameInput = document.getElementById('buyer-name');
+    const nameError = document.getElementById('name-error');
+    const cancelPurchaseBtn = document.getElementById('cancel-purchase');
+    const confirmPurchaseBtn = document.getElementById('confirm-purchase');
+    const closeThankyouBtn = document.getElementById('close-thankyou');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const totalGiftsEl = document.getElementById('total-gifts');
+    const purchasedGiftsEl = document.getElementById('purchased-gifts');
+    const remainingGiftsEl = document.getElementById('remaining-gifts');
+
+    // Current selected gift
+    let selectedGiftId = null;
+
+    // Initialize the app
+    function init() {
+        loadGifts();
+        setupEventListeners();
+    }
+
+    // Carrega presentes do Firestore
+    function loadGifts() {
+        db.collection("gifts").onSnapshot((snapshot) => {
+            gifts = [];
+            snapshot.forEach((doc) => {
+                gifts.push({id: doc.id, ...doc.data()});
+            });
+            renderGifts();
+            updateStats();
+        });
+    }
+
+    // Render gifts based on filter
+    function renderGifts(filter = 'all') {
+        giftList.innerHTML = '';
+
+        const filteredGifts = gifts.filter(gift => {
+            if (filter === 'all') return true;
+            if (filter === 'available') return !gift.purchased;
+            if (filter === 'purchased') return gift.purchased;
+            return true;
+        });
+
+        if (filteredGifts.length === 0) {
+            giftList.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">Nenhum presente encontrado</div>';
+            return;
+        }
+
+        filteredGifts.forEach(gift => {
+            const giftItem = document.createElement('div');
+            giftItem.className = `gift-item bg-white rounded-lg shadow-md overflow-hidden ${gift.purchased ? 'purchased opacity-80' : ''}`;
+
+            giftItem.innerHTML = `
+                    <div class="h-48 overflow-hidden">
+                        <img src="${gift.image}" alt="${gift.name}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg mb-1">${gift.name}</h3>
+                        ${gift.purchased ?
+                            `<p class="text-sm text-gray-500">Comprado por: <span class="font-medium">${gift.buyer}</span></p>` :
+                            `<button class="w-full py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition purchase-btn" data-id="${gift.id}">Selecionar</button>`
+                        }
+                    </div>
+                `;
+
+            giftList.appendChild(giftItem);
+        });
+    }
+
+    // Update statistics
+    function updateStats() {
+        const total = gifts.length;
+        const purchased = gifts.filter(gift => gift.purchased).length;
+        const remaining = total - purchased;
+
+        totalGiftsEl.textContent = total;
+        purchasedGiftsEl.textContent = purchased;
+        remainingGiftsEl.textContent = remaining;
+    }
+
+    // Add new gift to Firestore
+    function addGift() {
+        const name = giftNameInput.value.trim();
+        const image = giftImageInput.value.trim();
+
+        if (!name || !image) {
+            alert('Por favor, preencha todos os campos corretamente');
+            return;
+        }
+
+        db.collection("gifts").add({
+            name: name,
+            image: image,
+            purchased: false,
+            buyer: ''
+        }).then(() => {
+            giftNameInput.value = '';
+            giftImageInput.value = '';
+            addGiftModal.classList.add('hidden');
+        }).catch((error) => {
+            console.error("Error adding gift: ", error);
+            alert("Ocorreu um erro ao adicionar o presente. Por favor, tente novamente.");
+        });
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+        // Add gift button
+        addGiftBtn.addEventListener('click', () => {
+            addGiftModal.classList.remove('hidden');
+        });
+
+        // Cancel add gift
+        cancelAddGiftBtn.addEventListener('click', () => {
+            addGiftModal.classList.add('hidden');
+        });
+
+        // Confirm add gift
+        confirmAddGiftBtn.addEventListener('click', addGift);
+        // Filter buttons
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterButtons.forEach(b => b.classList.remove('bg-pink-600', 'text-white'));
+                filterButtons.forEach(b => b.classList.add('bg-gray-200', 'text-gray-700'));
+
+                btn.classList.remove('bg-gray-200', 'text-gray-700');
+                btn.classList.add('bg-pink-600', 'text-white');
+
+                renderGifts(btn.dataset.filter);
+            });
+        });
+
+        // Purchase modal
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('purchase-btn')) {
+                selectedGiftId = e.target.dataset.id;
+                console.log(selectedGiftId);
+                const gift = gifts.find(g => g.id === selectedGiftId);
+                console.log(gifts);
+                modalGiftName.textContent = gift.name;
+                purchaseModal.classList.remove('hidden');
+            }
+        });
+
+        // Cancel purchase
+        cancelPurchaseBtn.addEventListener('click', () => {
+            purchaseModal.classList.add('hidden');
+            buyerNameInput.value = '';
+            nameError.classList.add('hidden');
+        });
+
+        // Confirm purchase
+        confirmPurchaseBtn.addEventListener('click', () => {
+            if (buyerNameInput.value.trim() === '') {
+                nameError.classList.remove('hidden');
+                return;
+            }
+
+            const gift = gifts.find(g => g.id === selectedGiftId);
+            if (gift) {
+                db.collection("gifts").doc(gift.id).update({
+                    purchased: true,
+                    buyer: buyerNameInput.value.trim()
+                }).then(() => {
+                    purchaseModal.classList.add('hidden');
+                    thankyouModal.classList.remove('hidden');
+
+                    buyerNameInput.value = '';
+                    nameError.classList.add('hidden');
+                }).catch((error) => {
+                    console.error("Error updating gift: ", error);
+                    alert("Ocorreu um erro ao atualizar o presente. Por favor, tente novamente.");
+                });
+            }
+        });
+
+        // Close thank you modal
+        closeThankyouBtn.addEventListener('click', () => {
+            thankyouModal.classList.add('hidden');
+        });
+
+        // Close modals when clicking outside
+        [purchaseModal, thankyouModal, addGiftModal].forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
