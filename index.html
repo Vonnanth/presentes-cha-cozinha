@@ -121,13 +121,6 @@
                        placeholder="Ex: Jogo de Panelas">
             </div>
 
-            <div class="mb-4">
-                <label for="gift-image" class="block text-gray-700 mb-2">URL da Imagem:</label>
-                <input type="text" id="gift-image"
-                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                       placeholder="https://exemplo.com/imagem.jpg">
-            </div>
-
             <div class="flex justify-end space-x-4">
                 <button class="px-4 py-2 bg-gray-300 rounded-lg" id="cancel-add-gift">Cancelar</button>
                 <button class="px-4 py-2 bg-pink-600 text-white rounded-lg" id="confirm-add-gift">Adicionar</button>
@@ -175,7 +168,6 @@
     const cancelAddGiftBtn = document.getElementById('cancel-add-gift');
     const confirmAddGiftBtn = document.getElementById('confirm-add-gift');
     const giftNameInput = document.getElementById('gift-name');
-    const giftImageInput = document.getElementById('gift-image');
     const purchaseModal = document.getElementById('purchase-modal');
     const thankyouModal = document.getElementById('thankyou-modal');
     const modalGiftName = document.getElementById('modal-gift-name');
@@ -231,9 +223,6 @@
             giftItem.className = `gift-item bg-white rounded-lg shadow-md overflow-hidden ${gift.purchased ? 'purchased opacity-80' : ''}`;
 
             giftItem.innerHTML = `
-                    <div class="h-48 overflow-hidden">
-                        <img src="${gift.image}" alt="${gift.name}" class="w-full h-full object-cover">
-                    </div>
                     <div class="p-4">
                         <h3 class="font-bold text-lg mb-1">${gift.name}</h3>
                         ${gift.purchased ?
@@ -261,21 +250,18 @@
     // Add new gift to Firestore
     function addGift() {
         const name = giftNameInput.value.trim();
-        const image = giftImageInput.value.trim();
 
-        if (!name || !image) {
+        if (!name) {
             alert('Por favor, preencha todos os campos corretamente');
             return;
         }
 
         db.collection("gifts").add({
             name: name,
-            image: image,
             purchased: false,
             buyer: ''
         }).then(() => {
             giftNameInput.value = '';
-            giftImageInput.value = '';
             addGiftModal.classList.add('hidden');
         }).catch((error) => {
             console.error("Error adding gift: ", error);
@@ -314,9 +300,7 @@
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('purchase-btn')) {
                 selectedGiftId = e.target.dataset.id;
-                console.log(selectedGiftId);
                 const gift = gifts.find(g => g.id === selectedGiftId);
-                console.log(gifts);
                 modalGiftName.textContent = gift.name;
                 purchaseModal.classList.remove('hidden');
             }
